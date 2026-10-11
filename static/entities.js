@@ -23,7 +23,7 @@ function entRow(e) {
     + (others ? `<span class="ot" title="Band and mode slots marked for this entity">+${others} slot${others > 1 ? 's' : ''}</span>` : '')
     + (e.sat_credited ? '<span class="tag sat" title="Already credited for Satellite DXCC">SAT</span>' : '');
   const rank = e.mw_rank != null ? `<span class="rk" title="Club Log Most Wanted rank">#${e.mw_rank}</span>` : '';
-  return `<button type="button" class="ent click" data-dxcc="${e.dxcc}" title="Mark ${esc(e.name)} as awaiting credit or won't submit"><div class="px">${esc(e.prefix || '—')}</div><div class="nm">${esc(e.name)}</div>${tags}${rank}</button>`;
+  return `<button type="button" class="ent me click" data-dxcc="${e.dxcc}" title="Mark ${esc(e.name)} as awaiting credit or won't submit"><div class="px">${esc(e.prefix || '—')}</div><div class="nm">${esc(e.name)}</div>${rank}${tags ? `<div class="tg">${tags}</div>` : ''}</button>`;
 }
 
 function render() {

@@ -72,7 +72,18 @@ The **Export** button on the list pages offers four files. All follow the operat
 | `dxcc_analysis_YYYY-MM-DD.xlsx` | Summary, Missing Entities, Missing Slots, By Band, Matrix, Pending Marks, Paper QSLs |
 | `missing_entities.csv` | Never-credited entities with Most Wanted rank, marks and paper cards |
 | `missing_slots.csv` | One row per entity with a need (never-confirmed entities flagged in the last column); one column per profile band and mode |
-| `no_confirms.csv` | For DX Monitor: a drop-in replacement for its `no_confirms.csv` (`Entity,Prefix`, no byte-order mark). Copy it to DX Monitor's server folder and restart that container. |
+| `no_confirms.csv` | For DX Monitor (optional): a drop-in replacement for its `no_confirms.csv` (`Entity,Prefix`, no byte-order mark). See below. |
+
+### Loading the list into DX Monitor
+
+This is only for operators who also run DX Monitor; the analyzer works fully without it. DX Monitor builds `server/no_confirms.csv` into its Docker image and reads it once at start-up to seed its Trigger Builder picker. Copying the file to a folder on the server and restarting the container therefore has no effect. Instead:
+
+1. Download `no_confirms.csv` from the **Export** menu.
+2. In your local DX Monitor repository, replace `server/no_confirms.csv` with the downloaded file.
+3. Commit and push the change.
+4. In Portainer, open the `dxmon` stack and choose **Pull and redeploy**, so the image is rebuilt with the new file.
+
+DX Monitor's Needed list stays curated by hand; the new file only changes which entities its picker offers.
 
 ## Running the tests
 

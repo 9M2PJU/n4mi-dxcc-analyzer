@@ -66,10 +66,16 @@ input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--amber); }
 .group { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
 .group .gh { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 8px; font: 600 13px var(--mono); letter-spacing: .08em; }
 .group .gh .n { color: var(--amber); }
-.ent { display: flex; gap: 10px; align-items: baseline; }
+.ent { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
 .ent .px { flex: 0 0 64px; font: 600 13px var(--mono); color: var(--amber); overflow-wrap: anywhere; }
-.ent .nm { flex: 1 1 auto; font-size: 14px; }
+.ent .nm { flex: 1 1 8em; min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
 .ent .rk, .ent .ot { flex: 0 0 auto; font: 12px var(--mono); color: var(--muted); }
+/* Missing Entities: prefix, name and rank on line 1 (rank pinned right), tags on line 2 under the name. */
+.ent.me { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; }
+.ent.me .px { grid-column: 1; grid-row: 1; }
+.ent.me .nm { grid-column: 2; grid-row: 1; }
+.ent.me .rk { grid-column: 3; grid-row: 1; }
+.ent.me .tg { grid-column: 2 / 4; grid-row: 2; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
 
 /* tags: LoTW awaiting = amber dashed; paper card = light-blue dotted with icon */
 .tag { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
@@ -199,7 +205,7 @@ input.txt, input[type=date] { min-height: 40px; padding: 0 12px; border-radius: 
   #main > * + *, #main > section > * + * { margin-top: 10px; }
   .stat .v { font-size: 22px; } .stat .v small { font-size: 13px; } .stat { padding: 10px 12px; }
   h1 { font-size: 20px; } h2 { font-size: 15px; } .sub { font-size: 10pt; }
-  .ent .nm { font-size: 10pt; } .ent .px { flex-basis: 48px; font-size: 9pt; }
+  .ent .nm { font-size: 10pt; } .ent .px { flex-basis: 48px; font-size: 9pt; } .ent.me { grid-template-columns: 48px minmax(0, 1fr) auto; }
   .panel, .group, .strip, .stat { background: #fff; border-color: #999; }
   .stat, .strip, .ent, .gh { break-inside: avoid; }
   .group { display: block; } .group .ent + .ent { margin-top: 3px; }
