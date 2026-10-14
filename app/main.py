@@ -12,13 +12,14 @@ The database lives in DATA_DIR (default: the repo's data/ folder, which
 
 import logging
 import os
+from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import clublog, db
+from . import clublog, db, dxmon
 from .api import router
 from .reference import load_reference
 
@@ -30,11 +31,17 @@ PAGES = {"/": "entities.html", "/slots": "slots.html", "/matrix": "matrix.html",
          "/paper": "paper.html", "/import": "import.html", "/settings": "settings.html"}
 
 
-def create_app(db_path=None, reference=None, clublog_fetch=None):
+def create_app(db_path=None, reference=None, clublog_fetch=None, dxmon_fetch=None,
+               today=None):
     app = FastAPI(title="N4MI DXCC Analyzer", docs_url=None, redoc_url=None)
     app.state.db_error = None
     app.state.reference = reference or load_reference()
     app.state.clublog_fetch = clublog_fetch or clublog.fetch_raw
+    app.state.dxmon_fetch = dxmon_fetch or dxmon.fetch_raw
+    app.state.today = today or date.today   # injectable for tests
+    # The tested ADXO alias list; a row naming a non-current entity stops
+    # start-up loudly rather than mis-tagging a DXpedition later.
+    app.state.adxo_builtin = dxmon.load_builtin_aliases(app.state.reference)
     if db_path is None:
         env_dir = os.environ.get("DATA_DIR")
         data_dir = Path(env_dir or DEFAULT_DATA_DIR)

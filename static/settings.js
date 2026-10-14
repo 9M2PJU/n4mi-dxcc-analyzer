@@ -1,10 +1,12 @@
-// Settings: operating profile, Club Log Most Wanted, LoTW Account Status check.
+// Settings: operating profile, Club Log Most Wanted, LoTW Account Status check,
+// and DX Monitor (D54, optional).
 'use strict';
 
 const BANDS = ['160M', '80M', '40M', '30M', '20M', '17M', '15M', '12M', '10M', '6M', '2M'];
 const MODES = ['CW', 'PHONE', 'DIGITAL', 'SAT'];
 const DEFAULT = { bands: BANDS.slice(0, 10), modes: ['CW', 'PHONE', 'DIGITAL'] };
-const state = { mx: null, saved: null, draft: null, check: null, mwMsg: '', profMsg: '', asMsg: '' };
+const state = { mx: null, saved: null, draft: null, check: null, mwMsg: '', profMsg: '', asMsg: '',
+  dx: null, dxDraft: null, dxMsg: '', dxBusy: false };
 
 // Missing count per category, independent of the profile: band/mode slots on
 // Mixed-credited entities; Satellite across every current entity (a separate award).
@@ -57,6 +59,73 @@ function clubLogSection() {
   </section>`;
 }
 
+// ---------- DX Monitor (D54) ----------
+const OK_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5fd39a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+
+function dxEntityOptions() {
+  return state.mx.entities.slice().sort((a, b) => a.name.localeCompare(b.name))
+    .map((e) => `<option value="${e.dxcc}">${esc(e.name)} (${esc(e.prefix || '—')})</option>`).join('');
+}
+
+function dxmonSection() {
+  const d = state.dx || { enabled: false };
+  const draft = state.dxDraft ?? (d.url || '');
+  let status;
+  if (!d.enabled) {
+    status = '<div class="muted">Off: no address saved. No DXpedition tags; the For DX Monitor export is hidden.</div>';
+  } else if (d.ok) {
+    status = `<div class="notice ok">${OK_ICON}<div><div class="t">Connected</div>
+      <div class="muted small">ADXO list updated by DX Monitor ${esc(when(d.adxo_updated))} · ${d.entry_count} DXpeditions · ${d.watched_count} on your Watched list · checked ${esc(when(d.tried_at))} · refreshed automatically when Missing Entities opens, if older than 15 minutes${d.skipped ? ` · ${d.skipped} malformed entr${d.skipped === 1 ? 'y' : 'ies'} skipped` : ''}</div></div></div>`;
+  } else {
+    status = `<div class="notice held" role="alert"><div><div class="t">${esc(d.error || 'DX Monitor did not answer.')}</div>
+      <div>${d.fetched_at ? `Missing Entities keeps showing the list checked at ${esc(when(d.fetched_at))}, labelled with that time.` : 'No list has been received yet.'} Check that the dxmon stack is running in Portainer and the address is right.</div></div></div>`;
+  }
+  let names = '';
+  if (d.enabled && d.names) {
+    const n = d.names, placed = n.direct + n.builtin + n.approved;
+    const unplaced = d.unplaced || [];
+    const decided = d.decisions || [];
+    const canPick = state.mx.entities.length > 0;
+    names = `<div style="display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--line);padding-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap">
+        <h3 style="margin:0;font:700 16px var(--mono)">Entity names</h3>
+        <div class="muted small">${placed} of ${n.names} ADXO names placed: ${n.direct} match the entity table, ${n.builtin} from the built-in list${n.approved ? `, ${n.approved} approved by you` : ''}${n.ignored ? ` · ${n.ignored} ignored` : ''}${unplaced.length ? ` · <span style="color:var(--amber)">${unplaced.length} need${unplaced.length === 1 ? 's' : ''} your OK</span>` : ''}</div>
+      </div>
+      ${unplaced.length ? `<div class="mono small" style="letter-spacing:.1em;color:var(--amber)">NEEDS YOUR OK</div>
+        ${unplaced.map((u, i) => `<div class="panel" style="background:var(--bg);padding:14px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+          <div style="flex:1 1 300px"><div><span class="mono">“${esc(u.name)}”</span> <span class="muted small">in ADXO for ${esc(u.example)}</span></div>
+            <div class="small">${u.suggestion ? `Suggested: <strong>${esc(u.suggestion.name)}</strong> <span class="muted">· ${esc(u.suggestion.prefix || '—')} · DXCC ${u.suggestion.dxcc} · check it before approving</span>` : '<span class="muted">No close match found; choose the entity yourself or ignore it.</span>'}</div></div>
+          ${u.suggestion ? `<button class="btn" data-approve="${i}">Approve suggestion</button>` : ''}
+          ${canPick ? `<label class="small muted" style="display:flex;flex-direction:column;gap:2px">Or choose
+            <select data-pick="${i}" aria-label="Choose the entity for ${esc(u.name)}"><option value="">Another entity…</option>${dxEntityOptions()}</select></label>
+            <button class="btn" data-use="${i}">Use</button>` : ''}
+          <button class="btn" data-ignore="${i}">Ignore</button>
+        </div>`).join('')}` : ''}
+      <div class="mono small muted" style="letter-spacing:.1em">YOUR DECISIONS</div>
+      ${decided.length ? decided.map((x, i) => `<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);padding:6px 0">
+          <div style="flex:1 1 300px"><span class="mono">“${esc(x.name)}”</span> → ${x.dxcc ? `<strong>${esc(x.entity)}</strong>` : '<span class="muted">ignored (its DXpeditions get no tag)</span>'} <span class="muted small">· ${esc(when(x.decided_at))}</span></div>
+          <button class="btn" data-forget="${i}">Remove</button></div>`).join('')
+        : '<div class="muted small">None yet.</div>'}
+      <div class="muted small" style="max-width:900px">Suggestions are never applied on their own. A name the app can't place is never dropped: it stays listed here and its DXpedition simply has no tag until you decide. Your decisions are kept in the database and survive redeploys; the built-in list of known ADXO spellings ships with the app.</div>
+    </div>`;
+  }
+  return `<section class="panel" aria-labelledby="dx-h" style="display:flex;flex-direction:column;gap:18px">
+    <div style="max-width:900px"><h2 id="dx-h">DX Monitor <span class="muted" style="font-size:14px;font-weight:500">optional</span></h2>
+      <div class="muted small">Adds DXpedition tags to Missing Entities from DX Monitor's ADXO list, flags any that aren't on its Watched list, and offers the <strong>For DX Monitor</strong> export. Leave the address blank to turn every DX Monitor feature off; the analyzer works fully without it.</div></div>
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:6px;flex:1 1 320px;max-width:520px">
+        <label for="dx-url" class="mono small muted" style="letter-spacing:.1em">DX MONITOR ADDRESS</label>
+        <input id="dx-url" type="text" class="txt mono" value="${esc(draft)}" placeholder="http://192.168.6.29:8083" spellcheck="false" autocomplete="off"></div>
+      <button class="btn" id="dx-test"${state.dxBusy ? ' disabled' : ''}>Test connection</button>
+      <button class="btn primary" id="dx-save"${state.dxBusy ? ' disabled' : ''}>Save</button>
+      ${d.enabled ? `<button class="btn" id="dx-refresh"${state.dxBusy ? ' disabled' : ''}>Refresh now</button>` : ''}
+    </div>
+    <div class="small" role="status">${state.dxMsg}</div>
+    ${status}
+    ${names}
+  </section>`;
+}
+
 function checkResult(r) {
   if (!r || r.none) return '';
   const bad = r.reconciliation.filter((x) => !x.ok);
@@ -97,7 +166,7 @@ function statusSection() {
 function render() {
   const box = document.getElementById('as-box');
   const text = box ? box.value : '';
-  document.getElementById('main').innerHTML = profileSection() + clubLogSection() + statusSection();
+  document.getElementById('main').innerHTML = profileSection() + clubLogSection() + statusSection() + dxmonSection();
   document.getElementById('as-box').value = text;
   wire();
 }
@@ -140,6 +209,57 @@ function wire() {
       state.asMsg = ''; $('as-box').value = ''; render();
     } catch (err) { state.asMsg = `<span class="err">${esc(err.message)}</span>`; render(); }
   };
+  wireDX();
+}
+
+function wireDX() {
+  const $ = (id) => document.getElementById(id);
+  const url = () => $('dx-url').value;
+  $('dx-url').oninput = (e) => { state.dxDraft = e.target.value; };
+  const busy = async (msg, fn) => {
+    state.dxBusy = true; state.dxMsg = msg; render();
+    try { await fn(); } catch (err) { state.dxMsg = `<span class="err">${esc(err.message)}</span>`; }
+    state.dxBusy = false; render();
+  };
+  $('dx-test').onclick = () => busy('Trying DX Monitor…', async () => {
+    const r = await postJSON('/api/dxmon/test', { url: url() });
+    state.dxMsg = r.ok ? `<span class="up">DX Monitor answered: ${r.entry_count} DXpeditions, ${r.watched_count} watched. Not saved yet.</span>`
+      : `<span class="err">${esc(r.error)}</span>`;
+  });
+  $('dx-save').onclick = () => busy('Saving…', async () => {
+    state.dx = await api('/api/settings/dxmon', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: url() }) });
+    state.dxDraft = null;
+    state.dxMsg = state.dx.enabled ? '<span class="up">Saved.</span>' : '<span class="up">Saved: DX Monitor features are off.</span>';
+  });
+  if ($('dx-refresh')) $('dx-refresh').onclick = () => busy('Refreshing from DX Monitor…', async () => {
+    state.dx = await postJSON('/api/dxmon/refresh'); state.dxMsg = '';
+  });
+  const d = state.dx || {};
+  const decide = (name, dxcc, what) => busy('Saving…', async () => {
+    state.dx = await postJSON('/api/dxmon/names', { name, dxcc });
+    state.dxMsg = `<span class="up">${esc(what)}</span>`;
+  });
+  document.querySelectorAll('[data-approve]').forEach((b) => (b.onclick = () => {
+    const u = d.unplaced[+b.dataset.approve];
+    decide(u.name, u.suggestion.dxcc, `“${u.name}” is now ${u.suggestion.name}.`);
+  }));
+  document.querySelectorAll('[data-use]').forEach((b) => (b.onclick = () => {
+    const u = d.unplaced[+b.dataset.use];
+    const sel = document.querySelector(`[data-pick="${b.dataset.use}"]`);
+    if (!sel.value) { state.dxMsg = '<span class="err">Choose an entity from the list first.</span>'; render(); return; }
+    decide(u.name, +sel.value, `“${u.name}” is now ${sel.options[sel.selectedIndex].text}.`);
+  }));
+  document.querySelectorAll('[data-ignore]').forEach((b) => (b.onclick = () => {
+    const u = d.unplaced[+b.dataset.ignore];
+    decide(u.name, null, `“${u.name}” will be ignored.`);
+  }));
+  document.querySelectorAll('[data-forget]').forEach((b) => (b.onclick = () => {
+    const x = d.decisions[+b.dataset.forget];
+    busy('Removing…', async () => {
+      state.dx = await api(`/api/dxmon/names?name_norm=${encodeURIComponent(x.name_norm)}`, { method: 'DELETE' });
+      state.dxMsg = `<span class="up">Removed: “${esc(x.name)}” needs your OK again if it still appears in ADXO.</span>`;
+    });
+  }));
 }
 
 async function loadData() {
@@ -151,6 +271,15 @@ async function loadData() {
   state.mwFetched = status.most_wanted_fetched_at;
   state.check = check;
   state.noData = !!mx.no_data;
+  // Settings shows the stored DX Monitor state and never waits on DX Monitor
+  // itself (auto=false); a problem here must not break the rest of Settings.
+  try {
+    state.dx = await api('/api/dxmon?auto=false');
+  } catch (err) {
+    let url = '';
+    try { url = (await api('/api/settings/dxmon')).url; } catch (e) { /* unknown */ }
+    state.dx = { enabled: !!url, url, ok: false, error: err.message };
+  }
 }
 
 async function load() {
@@ -158,6 +287,11 @@ async function load() {
     await loadData();
     renderChrome({ title: 'Settings', subtitle: esc(profileText(state.saved)) });
     render();
+    // Links such as /settings#dx-h land on their section once it is drawn.
+    if (location.hash.length > 1) {
+      const el = document.getElementById(location.hash.slice(1));
+      if (el) el.scrollIntoView();
+    }
     if (state.noData) {
       document.getElementById('main').insertAdjacentHTML('afterbegin',
         '<div class="notice held"><div><div class="t">No matrix imported yet</div><div>The missing counts appear after your first import. <a href="/import">Import now</a></div></div></div>');

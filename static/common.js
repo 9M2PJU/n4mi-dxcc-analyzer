@@ -17,6 +17,7 @@ const num = (n) => Number(n).toLocaleString('en-US');
 function when(iso) {
   if (!iso) return '';
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);   // show odd values as they came
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
@@ -69,6 +70,18 @@ function renderChrome({ title, subtitle, actions = '' }) {
     </nav>
     <div id="health" role="alert"></div>`;
   checkHealth();
+  showDXMonExport();
+}
+
+// The For DX Monitor export appears only while DX Monitor is switched on in
+// Settings (D53). Reading the setting makes no call to DX Monitor itself.
+async function showDXMonExport() {
+  const item = document.querySelector('[data-dxmon]');
+  if (!item) return;
+  try {
+    const s = await (await fetch('/api/settings/dxmon')).json();
+    if (s.url) item.hidden = false;
+  } catch (e) { /* leave it hidden */ }
 }
 
 // Every page shows a plain warning when the app reports a problem: an
@@ -201,5 +214,5 @@ const EXPORT_MENU = `<details class="exportmenu">
     <a role="menuitem" href="/export/workbook.xlsx" download><b>Workbook (.xlsx)</b><span>Summary, missing entities and slots, by band, matrix, marks, paper QSLs</span></a>
     <a role="menuitem" href="/export/missing_entities.csv" download><b>Missing entities (.csv)</b><span>With Most Wanted rank, marks and paper cards</span></a>
     <a role="menuitem" href="/export/missing_slots.csv" download><b>Missing band slots (.csv)</b><span>One column per band and mode in your profile</span></a>
-    <a role="menuitem" href="/export/no_confirms.csv" download><b>For DX Monitor: no_confirms.csv</b><span>Drop-in file for DX Monitor's Trigger Builder picker</span></a>
+    <a role="menuitem" href="/export/no_confirms.csv" download data-dxmon hidden><b>For DX Monitor: no_confirms.csv</b><span>Drop-in file for DX Monitor's Trigger Builder picker</span></a>
   </div></details>`;

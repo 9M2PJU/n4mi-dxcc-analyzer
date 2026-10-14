@@ -85,6 +85,17 @@ This is only for operators who also run DX Monitor; the analyzer works fully wit
 
 DX Monitor's Needed list stays curated by hand; the new file only changes which entities its picker offers.
 
+## DXpeditions from DX Monitor (optional)
+
+If you also run DX Monitor, enter its address in **Settings → DX Monitor** (for example `http://192.168.6.29:8083`), then **Test connection** and **Save**. Leave the address blank to keep every DX Monitor feature off; the analyzer works fully without it.
+
+When it's on:
+
+- **Missing Entities** tags each needed entity that has a DXpedition in DX Monitor's ADXO list: **ON AIR** while it's active, or its start date if it starts within 30 days. **NOT WATCHED** means it isn't on DX Monitor's Watched list. A **DXpeditions first** sort is added.
+- The analyzer reads DX Monitor's `/api/adxo` and `/api/watched` (read-only) when Missing Entities opens, if its last try was over 15 minutes ago, or when you press **Refresh**. If DX Monitor doesn't answer, the last list received stays on screen with its time.
+- ADXO names entities in its own spelling. The app matches them to DXCC entities by name and a built-in list of known spellings. Any name it can't place is listed in Settings with a suggestion for you to approve, choose another entity, or ignore; nothing is applied without you.
+- The **For DX Monitor** export appears in the Export menu.
+
 ## Running the tests
 
 Requires Python 3.11 or later.

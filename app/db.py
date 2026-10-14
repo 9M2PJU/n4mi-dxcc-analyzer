@@ -82,6 +82,12 @@ CREATE TABLE IF NOT EXISTS external_data (
     fetched_at    TEXT NOT NULL,
     payload_json  TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS adxo_names (
+    name_norm   TEXT PRIMARY KEY,        -- dxmon.normalize(adxo_name)
+    adxo_name   TEXT NOT NULL,           -- as ADXO spelt it
+    dxcc        INTEGER,                 -- NULL = Dan chose Ignore
+    decided_at  TEXT NOT NULL
+);
 """
 
 PENDING = ("preview", "held")
@@ -347,3 +353,36 @@ def set_external(conn, name, payload):
                  "ON CONFLICT(name) DO UPDATE SET fetched_at = excluded.fetched_at, "
                  "payload_json = excluded.payload_json", (name, now(), json.dumps(payload)))
     conn.commit()
+
+
+# ---------- DX Monitor (D54) ----------
+
+def get_setting(conn, key, default=None):
+    r = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    return json.loads(r["value"]) if r else default
+
+
+def set_setting(conn, key, value):
+    conn.execute("INSERT INTO settings (key, value) VALUES (?, ?) "
+                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                 (key, json.dumps(value)))
+    conn.commit()
+
+
+def adxo_decisions(conn):
+    """Dan's approved and ignored ADXO names, oldest first."""
+    return [dict(r) for r in conn.execute("SELECT * FROM adxo_names ORDER BY decided_at, name_norm")]
+
+
+def decide_adxo_name(conn, name_norm, adxo_name, dxcc):
+    conn.execute("INSERT INTO adxo_names (name_norm, adxo_name, dxcc, decided_at) "
+                 "VALUES (?, ?, ?, ?) ON CONFLICT(name_norm) DO UPDATE SET "
+                 "adxo_name = excluded.adxo_name, dxcc = excluded.dxcc, "
+                 "decided_at = excluded.decided_at", (name_norm, adxo_name, dxcc, now()))
+    conn.commit()
+
+
+def forget_adxo_name(conn, name_norm):
+    n = conn.execute("DELETE FROM adxo_names WHERE name_norm = ?", (name_norm,)).rowcount
+    conn.commit()
+    return n

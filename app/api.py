@@ -7,13 +7,13 @@ before DXMon depends on it, so a page redesign can never break DXMon.
 """
 
 import json
-from datetime import date
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from . import analysis, clublog, db, exports
+from . import analysis, clublog, db, dxmon, exports
 from .categories import LABELS, MATRIX_CATEGORIES, MIXED, SAT, Profile
 from .marks import Mark, check_mark
 from .paper import PaperQSL, describe_entry, fills_in_profile, is_credited
@@ -534,6 +534,150 @@ def clublog_refresh(request: Request, conn=Depends(get_conn)):
     db.set_external(conn, "clublog_most_wanted", {str(k): v for k, v in ranks.items()})
     _, fetched = _rankings(conn)
     return {"entities_ranked": len(ranks), "fetched_at": fetched}
+
+
+# ---------- DX Monitor DXpeditions (D54; optional) ----------
+
+class DXMonURLBody(BaseModel):
+    url: str = Field("", max_length=200)
+
+
+class ADXONameBody(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    dxcc: int | None = None       # None = Ignore
+
+
+def _dxmon_try(request, conn, url):
+    """One fetch attempt; stores the result, or keeps the last good copy."""
+    try:
+        data = dxmon.fetch(url, request.app.state.dxmon_fetch)
+    except dxmon.DXMonError as exc:
+        db.set_external(conn, "dxmon_attempt", {"ok": False, "error": str(exc), "url": url})
+        return False
+    db.set_external(conn, "dxmon", data | {"url": url})
+    db.set_external(conn, "dxmon_attempt", {"ok": True, "error": None, "url": url})
+    return True
+
+
+def _age_min(stamp):
+    if not stamp:
+        return None
+    return (datetime.now(timezone.utc) - datetime.fromisoformat(stamp)).total_seconds() / 60
+
+
+def _matcher(request, conn):
+    decisions = {d["name_norm"]: d["dxcc"] for d in db.adxo_decisions(conn)}
+    return dxmon.Matcher(ref(request), request.app.state.adxo_builtin, decisions)
+
+
+def _dxmon_view(request, conn, auto=True):
+    url = db.get_setting(conn, "dxmon_url", "")
+    if not url:
+        return {"enabled": False}
+    attempt, tried_at = db.get_external(conn, "dxmon_attempt")
+    if auto and (attempt is None or attempt.get("url") != url
+                 or _age_min(tried_at) >= dxmon.AUTO_REFRESH_MIN):
+        _dxmon_try(request, conn, url)
+        attempt, tried_at = db.get_external(conn, "dxmon_attempt")
+    cache, fetched_at = db.get_external(conn, "dxmon")
+    if cache and cache.get("url") != url:
+        cache = None            # a list from a different address is not this one's
+    reference = ref(request)
+    entity = lambda d: reference.by_dxcc[d]  # noqa: E731
+    out = {"enabled": True, "url": url, "tried_at": tried_at,
+           "ok": bool(attempt and attempt["ok"]),
+           "error": attempt["error"] if attempt else None,
+           "fetched_at": fetched_at if cache else None,
+           "adxo_updated": cache["adxo_updated"] if cache else None,
+           "entry_count": len(cache["entries"]) if cache else 0,
+           "watched_count": len(cache["watched"]) if cache else 0,
+           "skipped": cache.get("skipped", 0) if cache else 0,
+           "decisions": [{"name": d["adxo_name"], "name_norm": d["name_norm"],
+                          "dxcc": d["dxcc"],
+                          "entity": entity(d["dxcc"]).lotw_name if d["dxcc"] else None,
+                          "decided_at": d["decided_at"]}
+                         for d in db.adxo_decisions(conn)]}
+    if cache:
+        credits, _ = db.current_credits(conn)
+        needed = ({e.dxcc for e in analysis.missing_entities(credits, reference)}
+                  if credits is not None else set())
+        out |= dxmon.build(cache, _matcher(request, conn), needed, request.app.state.today())
+    return out
+
+
+@router.get("/api/dxmon")
+def dxmon_view(request: Request, auto: bool = True, conn=Depends(get_conn)):
+    """DXpedition tags for Missing Entities. Refreshes from DX Monitor when the
+    last try is over 15 minutes old; otherwise answers from the stored copy.
+    Settings asks with auto=false, so it never waits on DX Monitor."""
+    return _dxmon_view(request, conn, auto=auto)
+
+
+@router.post("/api/dxmon/refresh")
+def dxmon_refresh(request: Request, conn=Depends(get_conn)):
+    url = db.get_setting(conn, "dxmon_url", "")
+    if not url:
+        raise HTTPException(409, "DX Monitor is off. Enter its address in Settings first.")
+    _dxmon_try(request, conn, url)
+    return _dxmon_view(request, conn, auto=False)
+
+
+@router.post("/api/dxmon/test")
+def dxmon_test(request: Request, body: DXMonURLBody):
+    """Try an address without saving it."""
+    try:
+        url = dxmon.check_url(body.url)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    if not url:
+        raise HTTPException(422, "Enter DX Monitor's address to test it.")
+    try:
+        data = dxmon.fetch(url, request.app.state.dxmon_fetch)
+    except dxmon.DXMonError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, "entry_count": len(data["entries"]),
+            "watched_count": len(data["watched"]), "adxo_updated": data["adxo_updated"]}
+
+
+@router.get("/api/settings/dxmon")
+def get_dxmon_settings(conn=Depends(get_conn)):
+    return {"url": db.get_setting(conn, "dxmon_url", "")}
+
+
+@router.put("/api/settings/dxmon")
+def put_dxmon_settings(request: Request, body: DXMonURLBody, conn=Depends(get_conn)):
+    """Save the address ('' turns every DX Monitor feature off), then fetch once."""
+    try:
+        url = dxmon.check_url(body.url)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    db.set_setting(conn, "dxmon_url", url)
+    if url:
+        _dxmon_try(request, conn, url)
+    return _dxmon_view(request, conn, auto=False)
+
+
+@router.post("/api/dxmon/names")
+def dxmon_decide(request: Request, body: ADXONameBody, conn=Depends(get_conn)):
+    """Approve an ADXO spelling as an entity (or Ignore it). Only Dan does this."""
+    name = body.name.strip()
+    key = dxmon.normalize(name)
+    if not key:
+        raise HTTPException(422, "That name has no letters or digits.")
+    if body.dxcc is not None:
+        e = ref(request).by_dxcc.get(body.dxcc)
+        if e is None or e.deleted:
+            raise HTTPException(422, f"DXCC {body.dxcc} is not a current entity.")
+    db.decide_adxo_name(conn, key, name, body.dxcc)
+    return _dxmon_view(request, conn, auto=False)
+
+
+@router.delete("/api/dxmon/names")
+def dxmon_forget(request: Request, name_norm: str, conn=Depends(get_conn)):
+    """Remove an approval or an Ignore; the name goes back to "needs your OK"."""
+    if not db.forget_adxo_name(conn, name_norm[:200]):
+        raise HTTPException(404, "No such approved or ignored name.")
+    return _dxmon_view(request, conn, auto=False)
 
 
 # ---------- exports (follow the profile, never a page's filters) ----------
