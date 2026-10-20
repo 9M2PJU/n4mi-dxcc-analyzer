@@ -26,7 +26,7 @@ Band slots (entities already credited for Mixed), one suggestion per entity:
   * order: credits per contact, then Most Wanted easiest first.
 
 Names are HamAlert's spellings, because DX Monitor matches spots by HamAlert's
-entity name (case and spacing ignored, nothing else). HamAlert uses Club Log's
+entity name (trimmed and lower-cased, nothing else). HamAlert uses Club Log's
 DXCC data, whose names are the ADIF names in our reference table; Dan checked
 all 63 of his needed entities plus 15 unusual or renamed ones in HamAlert's
 picker (2026-10-20). Two differ — HamAlert keeps the old names — and are listed
@@ -88,8 +88,11 @@ def _cap(word):
 
 
 def _key(name):
-    """DX Monitor's own matching form: case and spacing ignored, nothing else."""
-    return " ".join((name or "").split()).casefold()
+    """DX Monitor's own matching form, exactly: leading and trailing spaces
+    trimmed and lower-cased, nothing else. Spaces inside a name are NOT
+    collapsed (DX Monitor's _normalize_entity_name; confirmed by the DX Monitor
+    project 2026-10-20), so "St.  Paul" with two spaces never matches."""
+    return (name or "").strip().lower()
 
 
 def load_overrides(reference, path=OVERRIDES_FILE):

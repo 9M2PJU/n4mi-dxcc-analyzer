@@ -239,7 +239,7 @@ For each suggestion you want to chase:
 3. Build the matching **HamAlert trigger** (DX Monitor's Trigger Builder helps) with the identical entity, bands and modes.
 4. Back in the analyzer, press **Refresh** on Suggestions. The entry now shows **ALREADY IN DX MONITOR**.
 
-**Why the spelling matters:** DX Monitor matches HamAlert spots by HamAlert's entity name, ignoring only capitals and spacing.
+**Why the spelling matters:** DX Monitor matches HamAlert spots by HamAlert's entity name, ignoring only capitals and spaces at the start or end. A doubled space inside a name counts as a different spelling.
 
 - **A different spelling never matches.** LoTW's "U K BASES ON CYPRUS" won't match HamAlert's "UK Sovereign Base Areas on Cyprus", so an entry spelled that way never shows a hit.
 - **Where the analyzer's names come from:** HamAlert takes its entity data from Club Log, which uses the standard ADIF names, and the analyzer shows exactly those.

@@ -58,9 +58,10 @@ def test_every_current_entity_has_a_unique_name(reference, names):
 
 
 def test_place_matches_like_dx_monitor(names):
-    # Case and spacing ignored, nothing else — exactly DX Monitor's rule.
-    assert names.place("  amsterdam &  st. paul is. ") == 10
+    # Exactly DX Monitor's rule: trimmed and lower-cased, nothing else.
+    assert names.place("  amsterdam & st. paul is. ") == 10
     assert names.place("SWAZILAND") == 468
+    assert names.place("Amsterdam &  St. Paul Is.") is None   # a doubled inner space never matches
     assert names.place("Kingdom of Eswatini") is None      # HamAlert doesn't use it
     assert names.place("U K Bases on Cyprus") is None       # LoTW's spelling isn't HamAlert's
     assert names.place("Amsterdam & St Paul Is") is None    # a missing dot doesn't match either
