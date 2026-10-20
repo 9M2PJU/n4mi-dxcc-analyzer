@@ -10,6 +10,8 @@ It reads the ARRL Logbook of the World (LoTW) **Award Credit Matrix**, which Dan
 
 It runs LAN-only on a home NAS (FastAPI + SQLite + vanilla HTML/CSS/JS in Docker).
 
+**How to use it:** see the [User Guide](User_Guide.md), including how to use it together with [DX Monitor](https://github.com/N4MI73/n4mi-dx-monitor).
+
 ## Status
 
 **Phase 1, Build Step 3: ready to deploy on the UGreen NAS** (Docker, Portainer, port 8086). What exists:

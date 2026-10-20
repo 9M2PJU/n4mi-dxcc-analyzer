@@ -111,7 +111,7 @@ function dxmonSection() {
   }
   return `<section class="panel" aria-labelledby="dx-h" style="display:flex;flex-direction:column;gap:18px">
     <div style="max-width:900px"><h2 id="dx-h">DX Monitor <span class="muted" style="font-size:14px;font-weight:500">optional</span></h2>
-      <div class="muted small">Adds DXpedition tags to Missing Entities from DX Monitor's ADXO list, flags any that aren't on its Watched list, and offers the <strong>For DX Monitor</strong> export. Leave the address blank to turn every DX Monitor feature off; the analyzer works fully without it.</div></div>
+      <div class="muted small">Adds DXpedition tags to Missing Entities from DX Monitor's ADXO list, flags any that aren't on its Watched list, tags Suggestions already in its Needed list, and offers the <strong>For DX Monitor</strong> export. Leave the address blank to turn every DX Monitor feature off; the analyzer works fully without it.</div></div>
     <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
       <div style="display:flex;flex-direction:column;gap:6px;flex:1 1 320px;max-width:520px">
         <label for="dx-url" class="mono small muted" style="letter-spacing:.1em">DX MONITOR ADDRESS</label>
