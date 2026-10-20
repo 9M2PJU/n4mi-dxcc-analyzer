@@ -10,6 +10,10 @@ Monitor's endpoints, read-only:
                      expired entries are already removed by DX Monitor.
   GET /api/watched  {"count", "entries": [{"id", "callsign", "dxcc",
                      "source_adxo_id", "note", "added", ...}]}
+  GET /api/needed   {"count", "entries": [{"id", "entity", "band", "mode",
+                     "note", "added", ...}]}  — D55, optional; "entity" is
+                     HamAlert's spelling, band/mode comma-separated, blank = any
+                     (checked against DX Monitor commit 98161c7, 2026-10-20)
 
 (Checked against DX Monitor commit 6950a24, 2026-10-13.) Nothing is ever
 sent to DX Monitor. /api/adxo also feeds the Propagation Dashboard, so this
@@ -186,12 +190,55 @@ def parse_watched(data):
     return out
 
 
+def _split(v, limit=200):
+    """DX Monitor stores several bands or modes as one comma-separated string
+    (blank = any). A list of strings is accepted too; anything else means the
+    format has changed, and is refused rather than read as "any"."""
+    if v is None:
+        return []
+    if isinstance(v, list) and all(isinstance(x, str) for x in v):
+        v = ",".join(v)
+    if not isinstance(v, str):
+        raise DXMonError("DX Monitor's Needed list has a band or mode in an unexpected form.")
+    return sorted({p.strip().lower() for p in v[:limit].split(",") if p.strip()})
+
+
+def parse_needed(data):
+    """Validate /api/needed (D55). Returns (entries, skipped): the entity name as
+    typed in DX Monitor (HamAlert's spelling) and the band and mode sets
+    (empty = any). An empty list is valid: Dan may have no entries."""
+    obj = _json(data, "Needed list")
+    if not isinstance(obj, dict) or not isinstance(obj.get("entries"), list):
+        raise DXMonError("DX Monitor's Needed list wasn't in the expected form.")
+    if len(obj["entries"]) > MAX_ENTRIES:
+        raise DXMonError("DX Monitor's Needed list was far longer than expected.")
+    out, skipped = [], 0
+    for raw in obj["entries"]:
+        if isinstance(raw, dict) and _text(raw.get("entity"), 100):
+            out.append({"name": _text(raw.get("entity"), 100),
+                        "bands": _split(raw.get("band")), "modes": _split(raw.get("mode"))})
+        else:
+            skipped += 1
+    return out, skipped
+
+
 def fetch(base_url, fetcher=fetch_raw):
-    """Fetch and validate both lists. Raises DXMonError; never returns partial data."""
+    """Fetch and validate the lists. Raises DXMonError; never returns partial data.
+
+    The DXpedition and Watched lists must both succeed. The Needed list (D55,
+    used only for the curation advisor's "already in DX Monitor" tags) is
+    optional: if it fails, `needed` is None and `needed_error` says why, so an
+    older DX Monitor or a hiccup there never costs the DXpedition tags."""
     updated, entries, skipped = parse_adxo(fetcher(base_url + "/api/adxo"))
     watched = parse_watched(fetcher(base_url + "/api/watched"))
+    try:
+        needed, needed_skipped = parse_needed(fetcher(base_url + "/api/needed"))
+        needed_error = None
+    except DXMonError as exc:
+        needed, needed_skipped, needed_error = None, 0, str(exc)
     return {"adxo_updated": updated, "entries": entries, "skipped": skipped,
-            "watched": watched}
+            "watched": watched, "needed": needed, "needed_skipped": needed_skipped,
+            "needed_error": needed_error}
 
 
 # ---------- names ----------

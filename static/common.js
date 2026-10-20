@@ -38,7 +38,7 @@ const postJSON = (path, data) => api(path, { method: 'POST', headers: { 'Content
 
 const PAGES = [
   ['/', 'Missing Entities'], ['/slots', 'Missing Band Slots'], ['/matrix', 'Full Matrix'],
-  ['/paper', 'Paper QSLs'], ['/import', 'Import'], ['/settings', 'Settings'],
+  ['/advisor', 'Suggestions'], ['/paper', 'Paper QSLs'], ['/import', 'Import'], ['/settings', 'Settings'],
 ];
 
 function profileText(p) {
@@ -216,3 +216,21 @@ const EXPORT_MENU = `<details class="exportmenu">
     <a role="menuitem" href="/export/missing_slots.csv" download><b>Missing band slots (.csv)</b><span>One column per band and mode in your profile</span></a>
     <a role="menuitem" href="/export/no_confirms.csv" download data-dxmon hidden><b>For DX Monitor: no_confirms.csv</b><span>Drop-in file for DX Monitor's Trigger Builder picker</span></a>
   </div></details>`;
+
+// Copy text to the clipboard. The app is served over plain http on the LAN,
+// where browsers withhold navigator.clipboard, so fall back to a hidden textarea.
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; }
+  } catch (e) { /* fall through */ }
+  const t = document.createElement('textarea');
+  t.value = text;
+  t.setAttribute('readonly', '');
+  t.style.position = 'fixed'; t.style.opacity = '0';
+  document.body.appendChild(t);
+  t.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  t.remove();
+  return ok;
+}

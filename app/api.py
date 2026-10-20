@@ -7,15 +7,16 @@ before DXMon depends on it, so a page redesign can never break DXMon.
 """
 
 import json
+from collections import Counter
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from . import analysis, clublog, db, dxmon, exports
+from . import advisor, analysis, clublog, db, dxmon, exports
 from .categories import LABELS, MATRIX_CATEGORIES, MIXED, SAT, Profile
-from .marks import Mark, check_mark
+from .marks import AWAITING, Mark, check_mark
 from .paper import PaperQSL, describe_entry, fills_in_profile, is_credited
 from .parser import UploadError, parse_text, parse_upload
 from .status_check import compare, parse_status
@@ -516,8 +517,17 @@ def status_check_latest(conn=Depends(get_conn)):
     if row is None:
         return {"none": True}
     cur = db.current_snapshot(conn)
-    return json.loads(row["result_json"]) | {
-        "checked_at": row["checked_at"],
+    out = json.loads(row["result_json"])
+    # The LoTW pending numbers are as of the check; the marks side is recounted
+    # now, so marking a slot (e.g. Won't submit) updates the banner at once
+    # without re-running the check (raised by Dan 2026-10-13).
+    counts = Counter(m.category for _, m in db.active_marks(conn))
+    for x in out.get("pending", []):
+        x["app"] = counts.get(x["category"], 0)
+        x["ok"] = x["app"] == x["lotw"]
+    out["pending_match"] = all(x["ok"] for x in out.get("pending", []))
+    return out | {
+        "checked_at": row["checked_at"], "marks_recounted": True,
         "is_current_import": bool(cur and cur["id"] == row["snapshot_id"])}
 
 
@@ -554,6 +564,19 @@ def _dxmon_try(request, conn, url):
     except dxmon.DXMonError as exc:
         db.set_external(conn, "dxmon_attempt", {"ok": False, "error": str(exc), "url": url})
         return False
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    if data["needed"] is not None:
+        data["needed_fetched_at"] = now
+    else:
+        # Only the Needed list failed: keep the last good one from this address
+        # (with its time) rather than lose every "already in DX Monitor" tag.
+        old, _ = db.get_external(conn, "dxmon")
+        if old and old.get("url") == url and old.get("needed") is not None:
+            data["needed"] = old["needed"]
+            data["needed_skipped"] = old.get("needed_skipped", 0)
+            data["needed_fetched_at"] = old.get("needed_fetched_at")
+        else:
+            data["needed_fetched_at"] = None
     db.set_external(conn, "dxmon", data | {"url": url})
     db.set_external(conn, "dxmon_attempt", {"ok": True, "error": None, "url": url})
     return True
@@ -636,7 +659,9 @@ def dxmon_test(request: Request, body: DXMonURLBody):
     except dxmon.DXMonError as exc:
         return {"ok": False, "error": str(exc)}
     return {"ok": True, "entry_count": len(data["entries"]),
-            "watched_count": len(data["watched"]), "adxo_updated": data["adxo_updated"]}
+            "watched_count": len(data["watched"]), "adxo_updated": data["adxo_updated"],
+            "needed_count": None if data["needed"] is None else len(data["needed"]),
+            "needed_error": data["needed_error"]}
 
 
 @router.get("/api/settings/dxmon")
@@ -678,6 +703,102 @@ def dxmon_forget(request: Request, name_norm: str, conn=Depends(get_conn)):
     if not db.forget_adxo_name(conn, name_norm[:200]):
         raise HTTPException(404, "No such approved or ignored name.")
     return _dxmon_view(request, conn, auto=False)
+
+
+# ---------- curation advisor (D55; works without DX Monitor) ----------
+
+class AdvisorSettings(BaseModel):
+    entities: int = Field(advisor.DEFAULT_ENTITIES, ge=1, le=advisor.MAX_COUNT)
+    slots: int = Field(advisor.DEFAULT_SLOTS, ge=1, le=advisor.MAX_COUNT)
+    bands: list[str] = Field(default_factory=lambda: list(advisor.DEFAULT_SLOT_BANDS),
+                             max_length=20)
+    continents: list[str] = Field(default_factory=lambda: list(advisor.CONTINENTS),
+                                  max_length=10)
+
+
+def _advisor_settings(conn):
+    """Stored advisor settings (D57), with defaults for anything missing or
+    no longer valid (e.g. a band removed from DX Monitor's choices)."""
+    try:
+        st = AdvisorSettings(**(db.get_setting(conn, "advisor", {}) or {}))
+    except Exception:
+        st = AdvisorSettings()
+    st.bands = [b for b in st.bands if b in advisor.DXMON_BANDS]
+    st.continents = [c for c in st.continents if c in advisor.CONTINENTS]
+    return st
+
+
+def _advisor_settings_json(st):
+    return st.model_dump() | {
+        "default_bands": list(advisor.DEFAULT_SLOT_BANDS),
+        "band_choices": [{"code": b, "label": LABELS[b]} for b in advisor.DXMON_BANDS],
+        "continent_choices": [{"code": c, "label": n} for c, n in advisor.CONTINENTS.items()]}
+
+
+@router.get("/api/settings/advisor")
+def get_advisor_settings(conn=Depends(get_conn)):
+    return _advisor_settings_json(_advisor_settings(conn))
+
+
+@router.put("/api/settings/advisor")
+def put_advisor_settings(body: AdvisorSettings, conn=Depends(get_conn)):
+    bad = [b for b in body.bands if b not in advisor.DXMON_BANDS] + \
+          [c for c in body.continents if c not in advisor.CONTINENTS]
+    if bad:
+        raise HTTPException(422, f"Unknown band or continent: {', '.join(map(str, bad))}.")
+    body.bands = [b for b in advisor.DXMON_BANDS if b in body.bands]          # canonical order
+    body.continents = [c for c in advisor.CONTINENTS if c in body.continents]
+    db.set_setting(conn, "advisor", body.model_dump())
+    return _advisor_settings_json(body)
+
+
+@router.get("/api/advisor")
+def advisor_view(request: Request, entities: int | None = None, slots: int | None = None,
+                 auto: bool = True, conn=Depends(get_conn)):
+    """Suggestions for DX Monitor's Needed list, using the saved counts and
+    filters (D57). Reads DX Monitor only as the DXpedition tags do (auto-refresh
+    after 15 minutes); never writes to it."""
+    ctx = _context(conn)
+    if ctx is None:
+        return NO_DATA
+    credits, snap, profile = ctx
+    st = _advisor_settings(conn)
+    entities = st.entities if entities is None else entities
+    slots = st.slots if slots is None else slots
+    if not (1 <= entities <= advisor.MAX_COUNT and 1 <= slots <= advisor.MAX_COUNT):
+        raise HTTPException(422, f"Ask for 1 to {advisor.MAX_COUNT} entities and band slots.")
+    ranks, mw_fetched = _rankings(conn)
+    # Already confirmed and waiting: awaiting marks and paper cards. Won't-submit
+    # marks are not: that confirmation will never be credited.
+    covered = {(m.dxcc, m.category) for _, m in db.active_marks(conn) if m.state == AWAITING}
+    for _, c in db.active_cards(conn):
+        covered |= {(c.dxcc, cat) for cat in fills_in_profile(c, credits, profile)}
+    dx = _dxmon_view(request, conn, auto=auto)
+    cache, _ = db.get_external(conn, "dxmon") if dx.get("enabled") else (None, None)
+    if cache and cache.get("url") != dx.get("url"):
+        cache = None
+    needed = cache.get("needed") if cache else None
+    # "not_fetched": a copy stored before this feature, or none yet.
+    needed_state = ("off" if not dx.get("enabled") else
+                    "not_fetched" if not cache or "needed" not in cache else
+                    "failed" if needed is None else
+                    "stale" if cache.get("needed_error") else "ok")
+    out = advisor.suggest(credits, ref(request), profile, covered=covered, ranks=ranks,
+                          names=request.app.state.hamalert_names,
+                          dx_tags=dx.get("tags"), needed=needed,
+                          n_entities=entities, n_slots=slots,
+                          slot_bands=st.bands, slot_continents=st.continents)
+    return out | {
+        "settings": _advisor_settings_json(st),
+        "snapshot_id": snap["id"], "imported_at": snap["imported_at"],
+        "profile": _profile_json(profile), "most_wanted_fetched_at": mw_fetched,
+        "dxmon": {"enabled": dx.get("enabled", False), "ok": dx.get("ok"),
+                  "error": dx.get("error"), "tried_at": dx.get("tried_at"),
+                  "fetched_at": dx.get("fetched_at"),
+                  "needed_state": needed_state,
+                  "needed_fetched_at": cache.get("needed_fetched_at") if cache else None,
+                  "needed_skipped": cache.get("needed_skipped", 0) if cache else 0,
+                  "needed_error": cache.get("needed_error") if cache else None}}
 
 
 # ---------- exports (follow the profile, never a page's filters) ----------

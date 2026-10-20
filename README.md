@@ -29,6 +29,8 @@ It runs LAN-only on a home NAS (FastAPI + SQLite + vanilla HTML/CSS/JS in Docker
 | `app/api.py` | Internal endpoints for the app's own pages (not the DXMon contract) |
 | `app/main.py` | App setup, `/healthz`, start-up check |
 | `app/exports.py` | CSV and workbook exports, including the DX Monitor bridge file |
+| `app/dxmon.py` | Optional read-only link to DX Monitor: DXpeditions, Watched and Needed lists |
+| `app/advisor.py` | Suggestions page: what to add to DX Monitor's Needed list, in HamAlert's spellings |
 | `static/` | The web pages: plain HTML, CSS and JavaScript, no build step |
 | `app/data/dxcc_entities.csv` | The 402 DXCC entities (340 current), with continent and CQ zone |
 | `tools/build_reference.py` | Development only: rebuilds that table from the verified list and AD1C's `cty.csv` |
@@ -92,9 +94,21 @@ If you also run DX Monitor, enter its address in **Settings → DX Monitor** (fo
 When it's on:
 
 - **Missing Entities** tags each needed entity that has a DXpedition in DX Monitor's ADXO list: **ON AIR** while it's active, or its start date if it starts within 30 days. **NOT WATCHED** means it isn't on DX Monitor's Watched list. A **DXpeditions first** sort is added.
-- The analyzer reads DX Monitor's `/api/adxo` and `/api/watched` (read-only) when Missing Entities opens, if its last try was over 15 minutes ago, or when you press **Refresh**. If DX Monitor doesn't answer, the last list received stays on screen with its time.
+- The analyzer reads DX Monitor's `/api/adxo`, `/api/watched` and `/api/needed` (read-only) when Missing Entities opens, if its last try was over 15 minutes ago, or when you press **Refresh**. If DX Monitor doesn't answer, the last list received stays on screen with its time.
 - ADXO names entities in its own spelling. The app matches them to DXCC entities by name and a built-in list of known spellings. Any name it can't place is listed in Settings with a suggestion for you to approve, choose another entity, or ignore; nothing is applied without you.
 - The **For DX Monitor** export appears in the Export menu.
+
+## Suggestions for DX Monitor
+
+The **Suggestions** page lists the best targets for DX Monitor's hand-curated Needed list (its device holds 30 entries):
+
+- **Entities:** your never-confirmed entities. DXpeditions on the air or starting within 30 days come first, then Club Log Most Wanted, easiest first. In DX Monitor, add each one with band and mode left unticked.
+- **Band slots:** one suggestion per confirmed entity that still needs a band or mode. A suggestion that combines a needed band with a needed mode is worth 2 credits a contact, so those come first. The **Tick in DX Monitor** column shows exactly what to tick. Phone is SSB, and Digital is FT8 and FT4.
+- **Filters:** band and continent tickboxes narrow the band-slot list, for example 12 m and 10 m off near solar minimum, or only 6 m in an Es season. They're saved. 160 m and 6 m are off by default.
+- **What's left out:** anything awaiting credit or covered by a paper card. Won't-submit marks stay in, because that confirmation will never be credited.
+- **Names** are HamAlert's spellings, because DX Monitor matches spots by HamAlert's entity name. Use **Copy**, and paste the name exactly into DX Monitor and your HamAlert trigger. They come from the ADIF entity names, plus a short tested override list (`app/data/hamalert_overrides.csv`) for the two entities HamAlert still lists under old names (Swaziland, Macedonia).
+- **With DX Monitor switched on** (see above), suggestions already covered by its Needed list are tagged **ALREADY IN DX MONITOR**. The analyzer also reads DX Monitor's `/api/needed`, read-only. If that read fails, the DXpedition tags carry on and nothing is flagged. Needed entries whose name doesn't match any HamAlert entity are listed, because they would never get a hit.
+- **Without DX Monitor,** the page works the same, just without the tags.
 
 ## Running the tests
 

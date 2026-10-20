@@ -200,7 +200,8 @@ def test_clublog_refresh_failure_keeps_old(tmp_path, reference):
 
 def test_pages_and_static_files(client):
     for path, script in (("/", "entities.js"), ("/slots", "slots.js"), ("/import", "import.js"),
-                         ("/matrix", "matrix.js"), ("/paper", "paper.js"), ("/settings", "settings.js")):
+                         ("/matrix", "matrix.js"), ("/paper", "paper.js"), ("/settings", "settings.js"),
+                         ("/advisor", "advisor.js")):
         r = client.get(path)
         assert r.status_code == 200 and "text/html" in r.headers["content-type"]
         assert f"/static/{script}" in r.text

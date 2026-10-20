@@ -223,7 +223,7 @@ function wireDX() {
   };
   $('dx-test').onclick = () => busy('Trying DX Monitor…', async () => {
     const r = await postJSON('/api/dxmon/test', { url: url() });
-    state.dxMsg = r.ok ? `<span class="up">DX Monitor answered: ${r.entry_count} DXpeditions, ${r.watched_count} watched. Not saved yet.</span>`
+    state.dxMsg = r.ok ? `<span class="up">DX Monitor answered: ${r.entry_count} DXpeditions, ${r.watched_count} watched, ${r.needed_count == null ? 'Needed list not available (Suggestions won\'t show what\'s already in DX Monitor)' : r.needed_count + ' in its Needed list'}. Not saved yet.</span>`
       : `<span class="err">${esc(r.error)}</span>`;
   });
   $('dx-save').onclick = () => busy('Saving…', async () => {

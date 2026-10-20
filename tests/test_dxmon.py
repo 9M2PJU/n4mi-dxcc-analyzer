@@ -44,7 +44,11 @@ WATCHED = {"count": 2, "entries": [
 ]}
 
 
-def fake_dxmon(adxo=ADXO, watched=WATCHED):
+NEEDED = {"count": 1, "entries": [
+    {"id": "n1", "entity": "Somalia", "band": "", "mode": "", "note": "", "added": "x"}]}
+
+
+def fake_dxmon(adxo=ADXO, watched=WATCHED, needed=NEEDED):
     calls = []
 
     def fetch(url, timeout=dxmon.TIMEOUT_S):
@@ -53,6 +57,10 @@ def fake_dxmon(adxo=ADXO, watched=WATCHED):
             return json.dumps(adxo).encode() if not isinstance(adxo, bytes) else adxo
         if url.endswith("/api/watched"):
             return json.dumps(watched).encode() if not isinstance(watched, bytes) else watched
+        if url.endswith("/api/needed"):
+            if isinstance(needed, Exception):
+                raise needed
+            return json.dumps(needed).encode() if not isinstance(needed, bytes) else needed
         raise AssertionError(url)
     fetch.calls = calls
     return fetch
@@ -230,24 +238,25 @@ def test_save_address_fetches_and_tags(tmp_path, reference, credits):
         assert v["enabled"] and v["ok"] and v["url"] == "http://dxmon.lan:8083"
         assert v["entry_count"] == 9 and v["watched_count"] == 2
         assert v["tags"]["232"][0]["kind"] == "air" and v["summary"]["on_air"] == 1
-        assert fetch.calls == ["http://dxmon.lan:8083/api/adxo", "http://dxmon.lan:8083/api/watched"]
+        assert fetch.calls == ["http://dxmon.lan:8083/api/adxo", "http://dxmon.lan:8083/api/watched",
+                               "http://dxmon.lan:8083/api/needed"]
         # Opening Missing Entities again within 15 minutes uses the stored copy.
         assert c.get("/api/dxmon").json()["tags"] == v["tags"]
-        assert len(fetch.calls) == 2
+        assert len(fetch.calls) == 3
 
 
 def test_auto_refresh_after_15_minutes(tmp_path, reference):
     fetch = fake_dxmon()
     with make_client(tmp_path, reference, fetch) as c:
         c.put("/api/settings/dxmon", json={"url": "http://dxmon.lan:8083"})
-        assert len(fetch.calls) == 2
+        assert len(fetch.calls) == 3
         conn = __import__("sqlite3").connect(tmp_path / "d.db")
         conn.execute("UPDATE external_data SET fetched_at = '2026-01-01T00:00:00+00:00' "
                      "WHERE name = 'dxmon_attempt'")
         conn.commit()
         conn.close()
         c.get("/api/dxmon")
-        assert len(fetch.calls) == 4
+        assert len(fetch.calls) == 6
 
 
 def test_failure_keeps_last_good_copy(tmp_path, reference, credits):
@@ -279,7 +288,7 @@ def test_changing_the_address_fetches_again(tmp_path, reference):
     with make_client(tmp_path, reference, fetch) as c:
         c.put("/api/settings/dxmon", json={"url": "http://a.lan:8083"})
         c.put("/api/settings/dxmon", json={"url": "http://b.lan:8083"})
-        assert fetch.calls[-1] == "http://b.lan:8083/api/watched"
+        assert fetch.calls[-1] == "http://b.lan:8083/api/needed"
         assert c.put("/api/settings/dxmon", json={"url": ""}).json() == {"enabled": False}
 
 
@@ -390,7 +399,7 @@ def test_settings_view_never_fetches(tmp_path, reference):
         c.get("/api/dxmon", params={"auto": "false"})
         assert len(fetch.calls) == n            # stale, but Settings doesn't fetch
         c.get("/api/dxmon")
-        assert len(fetch.calls) == n + 2        # Missing Entities does
+        assert len(fetch.calls) == n + 3        # Missing Entities does
 
 
 def test_your_decision_outranks_the_builtin_list(reference):

@@ -19,7 +19,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import clublog, db, dxmon
+from . import advisor, clublog, db, dxmon
 from .api import router
 from .reference import load_reference
 
@@ -28,7 +28,8 @@ DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 # Page URL -> HTML file.
 PAGES = {"/": "entities.html", "/slots": "slots.html", "/matrix": "matrix.html",
-         "/paper": "paper.html", "/import": "import.html", "/settings": "settings.html"}
+         "/advisor": "advisor.html", "/paper": "paper.html", "/import": "import.html",
+         "/settings": "settings.html"}
 
 
 def create_app(db_path=None, reference=None, clublog_fetch=None, dxmon_fetch=None,
@@ -42,6 +43,10 @@ def create_app(db_path=None, reference=None, clublog_fetch=None, dxmon_fetch=Non
     # The tested ADXO alias list; a row naming a non-current entity stops
     # start-up loudly rather than mis-tagging a DXpedition later.
     app.state.adxo_builtin = dxmon.load_builtin_aliases(app.state.reference)
+    # HamAlert's entity spellings (D55): ADIF names plus a tested override list;
+    # a bad row or a duplicate name stops start-up for the same reason.
+    app.state.hamalert_names = advisor.Names(app.state.reference,
+                                             advisor.load_overrides(app.state.reference))
     if db_path is None:
         env_dir = os.environ.get("DATA_DIR")
         data_dir = Path(env_dir or DEFAULT_DATA_DIR)
