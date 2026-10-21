@@ -33,6 +33,7 @@ worse than a rejected paste):
 import csv
 import io
 import re
+import zipfile
 from dataclasses import dataclass, field
 
 from .categories import MATRIX_COLUMNS
@@ -217,15 +218,61 @@ def parse_csv_bytes(data):
     return parse_cells((i + 1, row) for i, row in enumerate(reader))
 
 
+# Workbook limits (security review DXCC-04, 2026-10-21). The LoTW matrix is
+# about 410 rows by 19 columns; these allow generous slack while stopping a small
+# compressed file from expanding into a huge grid before validation.
+XLSX_MAX_ROWS = 2000
+XLSX_MAX_COLS = 60
+XLSX_MAX_MEMBERS = 200
+XLSX_MAX_UNPACKED = 5 * 1024 * 1024      # all files inside the .xlsx, uncompressed
+# A real matrix unpacks to about 0.2 MB (sheet ~0.2 MB). openpyxl parses a whole
+# row, and all of styles.xml, before any count can stop it, so every XML part
+# is also capped on its own (by type, not path: a workbook can put its sheet anywhere).
+XLSX_MAX_PART = 2 * 1024 * 1024
+
+
+def _check_xlsx_container(data):
+    """Refuse a workbook whose unpacked contents are far larger than any matrix,
+    before openpyxl reads anything."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            infos = z.infolist()
+    except zipfile.BadZipFile as exc:
+        raise UploadError("Could not open the spreadsheet: it isn't a valid .xlsx file.") from exc
+    big_part = any(i.file_size > XLSX_MAX_PART for i in infos
+                   if i.filename.lower().endswith((".xml", ".rels")))
+    if (len(infos) > XLSX_MAX_MEMBERS or big_part
+            or sum(i.file_size for i in infos) > XLSX_MAX_UNPACKED):
+        raise UploadError("This spreadsheet is far larger than a LoTW matrix once unpacked, "
+                          "so it wasn't read.")
+
+
 def parse_xlsx_bytes(data):
+    _check_xlsx_container(data)
     try:
         import openpyxl
         wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
     except Exception as exc:  # corrupt or not really a workbook
         raise UploadError(f"Could not open the spreadsheet: {exc}") from exc
+    too_big = UploadError(f"This spreadsheet has more than {XLSX_MAX_ROWS} rows or "
+                          f"{XLSX_MAX_COLS} columns, far more than a LoTW matrix, so it wasn't read.")
     try:
         ws = wb.worksheets[0]
-        rows = [(i + 1, list(r)) for i, r in enumerate(ws.iter_rows(values_only=True))]
+        # Read the rows actually present, counting as we go, rather than trusting
+        # the declared size, which can be wrong either way (too large, or too
+        # small and silently cutting rows off).
+        ws.reset_dimensions()
+        rows = []
+        for i, r in enumerate(ws.iter_rows(values_only=True)):
+            if i >= XLSX_MAX_ROWS or len(r) > XLSX_MAX_COLS:
+                raise too_big
+            rows.append((i + 1, list(r)))
+        # Rows read this way stop at their last filled cell; pad them back to a
+        # common width, as the spreadsheet's grid would show them.
+        width = max((len(r) for _, r in rows), default=0)
+        rows = [(n, r + [None] * (width - len(r))) for n, r in rows]
+    except UploadError:
+        raise
     except Exception as exc:  # opens, but fails while reading
         raise UploadError(f"Could not read the spreadsheet: {exc}") from exc
     finally:

@@ -79,6 +79,18 @@ def check_url(url):
     return f"{p.scheme}://{p.netloc}"
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """DX Monitor never redirects. Following one would let a chosen server bounce
+    the request to some other address and path on the network, so any redirect
+    is refused (security review DXCC-02, 2026-10-21)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(req.full_url, code, "redirect refused", headers, fp)
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def fetch_raw(url, timeout=TIMEOUT_S, deadline=DEADLINE_S):
     """GET one URL; return the body (at most MAX_BYTES).
 
@@ -88,7 +100,7 @@ def fetch_raw(url, timeout=TIMEOUT_S, deadline=DEADLINE_S):
                                                "Accept": "application/json"})
     end = time.monotonic() + deadline
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _OPENER.open(req, timeout=timeout) as resp:
             if resp.status != 200:
                 raise DXMonError(f"DX Monitor answered HTTP {resp.status}.")
             chunks, size = [], 0
@@ -105,6 +117,9 @@ def fetch_raw(url, timeout=TIMEOUT_S, deadline=DEADLINE_S):
     except DXMonError:
         raise
     except urllib.error.HTTPError as exc:
+        if 300 <= exc.code < 400:
+            raise DXMonError(f"DX Monitor answered with a redirect (HTTP {exc.code}), which the "
+                             "analyzer doesn't follow; check the address.") from exc
         raise DXMonError(f"DX Monitor answered HTTP {exc.code}; check the address.") from exc
     except Exception as exc:
         raise DXMonError(f"DX Monitor didn't answer ({_reason(exc)}).") from exc

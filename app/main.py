@@ -32,9 +32,19 @@ PAGES = {"/": "entities.html", "/slots": "slots.html", "/matrix": "matrix.html",
          "/settings": "settings.html"}
 
 
+def _page_endpoint(file_path):
+    """A route for one fixed HTML page. The endpoint takes NO parameters: an
+    earlier version used `lambda page=page: ...`, and FastAPI exposed that
+    default argument as a `?page=` query parameter, so a caller could choose any
+    readable file (security review DXCC-01, 2026-10-21)."""
+    def endpoint():
+        return FileResponse(file_path)
+    return endpoint
+
+
 def create_app(db_path=None, reference=None, clublog_fetch=None, dxmon_fetch=None,
                today=None):
-    app = FastAPI(title="N4MI DXCC Analyzer", docs_url=None, redoc_url=None)
+    app = FastAPI(title="N4MI DXCC Analyzer", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.db_error = None
     app.state.reference = reference or load_reference()
     app.state.clublog_fetch = clublog_fetch or clublog.fetch_raw
@@ -79,8 +89,7 @@ def create_app(db_path=None, reference=None, clublog_fetch=None, dxmon_fetch=Non
         log.error(app.state.db_error)
     app.include_router(router)
     for path, page in PAGES.items():
-        app.add_api_route(path, lambda page=page: FileResponse(STATIC_DIR / page),
-                          include_in_schema=False)
+        app.add_api_route(path, _page_endpoint(STATIC_DIR / page), include_in_schema=False)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app
 
