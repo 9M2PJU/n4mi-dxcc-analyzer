@@ -155,7 +155,7 @@ function checkResult(r) {
 function statusSection() {
   return `<section class="panel" aria-labelledby="as-h" style="display:flex;flex-direction:column;gap:14px">
     <div><h2 id="as-h">Check against LoTW Account Status</h2>
-      <div class="muted small">Optional. Copy the <strong>Account Status</strong> table from LoTW's DXCC page and paste it here. The app checks its credit counts against “DXCC Credits Awarded”, and your pending marks against “New LoTW QSLs” plus “LoTW QSLs in Process”.</div></div>
+      <div class="muted small">Optional. In LoTW's <strong>Awards › DXCC Award Account</strong>, copy the <strong>Account Status</strong> box from the DXCC Award heading down to the Challenge row, and paste it here (<a href="/help#checking-against-lotw-account-status">step-by-step</a>). The app checks its credit counts against “DXCC Credits Awarded”, and your pending marks against “New LoTW QSLs” plus “LoTW QSLs in Process”.</div></div>
     <label for="as-box" class="mono small muted" style="letter-spacing:.1em">ACCOUNT STATUS TABLE</label>
     <textarea id="as-box" rows="5" spellcheck="false" style="min-height:120px" placeholder="Award&#9;New LoTW QSLs&#9;LoTW QSLs in Process&#9;DXCC Credits Awarded&#9;Total&#10;Mixed *&#9;…"></textarea>
     <div style="display:flex;gap:12px;align-items:center"><button class="btn primary" id="check">Check</button><span class="small" role="status">${state.asMsg}</span></div>

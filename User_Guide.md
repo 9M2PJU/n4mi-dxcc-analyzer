@@ -4,10 +4,14 @@ This guide explains what the analyzer does and how to use it once it's running. 
 
 The screenshots use made-up data for a test callsign, N0CALL, so the numbers in them don't belong to any real station.
 
+In the app, this guide is the **Help** page. The **Help** link at the top of every page opens it at that page's section, and the version you're running is shown beside the app's name.
+
 ## Contents
 
 - [The big picture](#the-big-picture)
 - [Getting your LoTW data in (Import)](#getting-your-lotw-data-in-import)
+  - [Copying the matrix from LoTW](#copying-the-matrix-from-lotw)
+  - [Pasting it in](#pasting-it-in)
 - [Missing Entities](#missing-entities)
 - [Missing Band Slots](#missing-band-slots)
 - [Full Matrix](#full-matrix)
@@ -15,6 +19,7 @@ The screenshots use made-up data for a test callsign, N0CALL, so the numbers in 
 - [Paper QSLs](#paper-qsls)
 - [Suggestions for DX Monitor](#suggestions-for-dx-monitor)
 - [Settings](#settings)
+  - [Checking against LoTW Account Status](#checking-against-lotw-account-status)
 - [Exports and printing](#exports-and-printing)
 - [Using the analyzer with DX Monitor](#using-the-analyzer-with-dx-monitor)
 - [Best practices](#best-practices)
@@ -38,14 +43,41 @@ The analyzer runs on your own network, with no login and no account anywhere. It
 
 ## Getting your LoTW data in (Import)
 
-![The Import page after a paste is checked: credits now versus this paste, what changes, and the import history.](images/import_preview.png)
+<div class="callout" markdown="1">
+<div class="t"><strong>Two LoTW tables, two places</strong></div>
 
-1. In LoTW, open your DXCC **Award Credit Matrix**, select the whole table, and copy it.
-2. In the analyzer, open **Import** (or press **Paste new matrix** on any list page), paste into the box, and press **Check paste**. You can also **Upload a file** (`.txt`, `.csv` or `.xlsx`) if you've saved the matrix that way.
-3. Read the check, then press **Save**. The check shows:
+LoTW's DXCC Award Account page has two tables that are easy to mix up:
+
+- **Award Credit Matrix** (the long list, one row per entity) goes into **Import**. This is how your credits get into the analyzer.
+- **Account Status** (the short box of counts at the top of the page) goes into **Settings → Check against LoTW Account Status**. It's an optional cross-check; see [Checking against LoTW Account Status](#checking-against-lotw-account-status).
+
+Paste one in the other's place and the analyzer tells you which page it belongs on.
+</div>
+
+### Copying the matrix from LoTW
+
+1. Log in to LoTW and open the **Awards** tab.
+2. Choose **DXCC Award Account**.
+3. Under the **Account Status** box, click **View Award Credit Matrix**. The link appears only for **DXCC Credits Awarded**, not for "New LoTW QSLs" or "LoTW QSLs in Process".
+4. Click **No Scroll**, so the whole table is on one long page.
+5. Select **everything from the "DXCC Award Credit Report" banner down to the last cell of the table**. The banner is the title line, with your name and callsign just below it; the last cell is the 2 m box of the bottom row (ZS9, Walvis Bay). An easy way: click just before the banner, scroll to the bottom, then hold **Shift** and click just after the last cell.
+6. Copy (**Ctrl+C**).
+
+![Where to start and stop the selection: from the DXCC Award Credit Report banner to the 2 m box of the last row.](images/copy_matrix.svg)
+
+Extra text above the banner does no harm. Stop at the last cell, though: if the ARRL copyright line under the table comes along, the check rejects the paste and says so. Copy again, or delete that line from the box.
+
+### Pasting it in
+
+1. In the analyzer, open **Import** (or press **Paste new matrix** on any list page), paste into the box, and press **Check paste**.
+2. Read the check, then press **Save**. The check shows:
    - each category's credits now and in this paste
    - the new entities and band or mode slots this import adds
    - any pending marks or paper cards it will clear
+
+![The Import page after a paste is checked: credits now versus this paste, what changes, and the import history.](images/import_preview.png)
+
+**Optional: through a spreadsheet.** If you'd rather keep a copy, paste into cell **A1** of a new spreadsheet (Excel, LibreOffice Calc or Google Sheets), save it as `.xlsx` or `.csv`, and use **Upload a file**. A plain `.txt` file works too. Older `.xls` and `.ods` files aren't accepted.
 
 Nothing is saved until you press Save. There are three possible outcomes:
 
@@ -164,10 +196,24 @@ A ranked list of the best targets for DX Monitor's Needed list, with the exact n
 
 - **Operating profile:** tick the bands and modes you chase; each box shows how many entities still need it. **Save profile** recalculates every view; nothing is re-imported. **Reset to 160–6 m** restores the default. Mixed is always tracked. 70 cm can't be tracked, because LoTW's matrix has no 70 cm column.
 - **Club Log Most Wanted:** **Refresh rankings** fetches Club Log's public list (no account needed) for the easiest-first and rarest-first sorts. It's only fetched when you press the button. If a fetch fails, the previous list is kept.
-- **Check against LoTW Account Status:** optional. Copy the Account Status table from LoTW's DXCC page, paste it, and press **Check**. It checks two things:
-  - **Credits:** the analyzer's credit counts must equal "DXCC Credits Awarded" in every category. A mismatch is reported as a problem.
-  - **Pending marks:** your marks are compared with LoTW's "New LoTW QSLs" plus "LoTW QSLs in Process". The pending comparison updates as you change marks, without re-running the check.
+- **Check against LoTW Account Status:** optional. Proves the analyzer's counts agree with LoTW; see the next section.
 - **DX Monitor:** optional. See the next sections.
+
+### Checking against LoTW Account Status
+
+Optional, but the quickest way to prove the analyzer agrees with LoTW. Use an Account Status table from the **same day** as your last import.
+
+1. In LoTW, open **Awards → DXCC Award Account**.
+2. In the **Account Status** box at the top, select from the **DXCC Award** column heading down to the **Challenge** row, the last row of the box. Don't click View Award Credit Matrix; that table is for Import.
+3. Copy (**Ctrl+C**), then in the analyzer open **Settings → Check against LoTW Account Status**, paste, and press **Check**.
+
+![Where to start and stop the selection: from the DXCC Award heading to the Challenge row.](images/copy_account_status.svg)
+
+Reading the result:
+
+- **Credits:** every category should match "DXCC Credits Awarded". A mismatch is a real problem, not rounding. First import a fresh matrix from the same day and check again; if it still disagrees, report it.
+- **Pending marks:** your Awaiting and Won't-submit marks are compared with LoTW's "New LoTW QSLs" plus "LoTW QSLs in Process". A difference usually means a mark to add or remove. This comparison updates as you change marks, without running the check again.
+- 70 cm and Challenge are listed but not checked, because the matrix has no 70 cm column.
 
 ## Exports and printing
 
@@ -269,7 +315,8 @@ For each suggestion you want to chase:
 
 | Symptom | First things to check |
 |---|---|
-| An import is rejected | The paste is incomplete: copy the whole matrix table from LoTW again. The message names the line |
+| An import is rejected | The paste is incomplete: copy the whole matrix table from LoTW again, from the banner to the last cell. The message names the line |
+| Import says it's the Account Status table | You copied the summary box. Click **View Award Credit Matrix** and copy that table instead; the Account Status table goes in Settings |
 | An import is held for review | A credit would go down. Check LoTW; save anyway only if the drop is real |
 | Counts don't match LoTW's Account Status | Run the check in Settings with a same-day Account Status table. A mismatch is a defect worth reporting |
 | The Settings pending check shows a mismatch | A confirmation is missing a mark, or a mark has no matching confirmation; the line says which |
@@ -279,3 +326,4 @@ For each suggestion you want to chase:
 | Suggestions shows no ALREADY IN DX MONITOR tags | DX Monitor isn't connected, or its Needed list couldn't be read (the strip says which). An older DX Monitor without `/api/needed` simply gives no tags |
 | A DX Monitor Needed entry never gets a hit | Check its spelling against the HamAlert name in Suggestions, and that a matching HamAlert trigger exists |
 | Every page shows a "Problem" banner | The database or the data folder isn't readable; see the README's deployment section |
+| Which version am I running? | It's beside the app's name at the top of every page |

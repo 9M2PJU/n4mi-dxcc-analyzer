@@ -16,10 +16,10 @@ from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import advisor, clublog, db, dxmon
+from . import advisor, clublog, db, dxmon, guide
 from .api import router
 from .reference import load_reference
 
@@ -42,8 +42,15 @@ def _page_endpoint(file_path):
     return endpoint
 
 
+def _help_endpoint(html):
+    """The Help page, rendered once at start-up. No parameters (see above)."""
+    def endpoint():
+        return HTMLResponse(html)
+    return endpoint
+
+
 def create_app(db_path=None, reference=None, clublog_fetch=None, dxmon_fetch=None,
-               today=None):
+               today=None, guide_path=None):
     app = FastAPI(title="N4MI DXCC Analyzer", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.db_error = None
     app.state.reference = reference or load_reference()
@@ -90,6 +97,16 @@ def create_app(db_path=None, reference=None, clublog_fetch=None, dxmon_fetch=Non
     app.include_router(router)
     for path, page in PAGES.items():
         app.add_api_route(path, _page_endpoint(STATIC_DIR / page), include_in_schema=False)
+    # The user guide (D58): User_Guide.md rendered once; its screenshots are
+    # served from images/. A missing folder only loses the pictures (404),
+    # never start-up.
+    app.state.guide = guide.render(guide_path or guide.GUIDE_PATH)
+    if app.state.guide.error:
+        log.warning(app.state.guide.error)
+    help_html = guide.page((STATIC_DIR / "help.html").read_text(encoding="utf-8"), app.state.guide)
+    app.add_api_route("/help", _help_endpoint(help_html), include_in_schema=False)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    if guide.IMAGES_DIR.is_dir():
+        app.mount("/images", StaticFiles(directory=guide.IMAGES_DIR), name="images")
     return app
 

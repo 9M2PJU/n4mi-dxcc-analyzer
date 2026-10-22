@@ -21,6 +21,7 @@ from .paper import PaperQSL, describe_entry, fills_in_profile, is_credited
 from .parser import UploadError, parse_text, parse_upload
 from .status_check import compare, parse_status
 from .validate import HELD, REJECTED, validate
+from .version import VERSION
 
 MAX_UPLOAD = 5 * 1024 * 1024
 router = APIRouter()
@@ -107,7 +108,7 @@ def healthz():
 @router.get("/api/status")
 def status(request: Request):
     if request.app.state.db_error:
-        return {"ok": False, "error": request.app.state.db_error}
+        return {"ok": False, "error": request.app.state.db_error, "version": VERSION}
     try:
         conn = db.connect(request.app.state.db_path)
         try:
@@ -119,13 +120,13 @@ def status(request: Request):
         finally:
             conn.close()
     except Exception as exc:          # unreadable database: report it plainly
-        return {"ok": False, "error": f"Database problem: {exc}"}
+        return {"ok": False, "error": f"Database problem: {exc}", "version": VERSION}
     out = {"ok": not unknown, "error": None, "callsign": snap["callsign"] if snap else None,
            "snapshot": ({"id": snap["id"], "imported_at": snap["imported_at"],
                          "saved_at": snap["saved_at"]} if snap else None),
            "entities_credited": sum(1 for c in credits.values() if MIXED in c),
            "most_wanted_fetched_at": mw_fetched, "last_status_check": None,
-           "reference_problems": unknown}
+           "reference_problems": unknown, "version": VERSION}
     if unknown:
         out["error"] = ("Stored data has DXCC numbers the reference table doesn't know: "
                         f"{unknown}. The reference table may have been changed.")

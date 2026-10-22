@@ -39,7 +39,17 @@ const postJSON = (path, data) => api(path, { method: 'POST', headers: { 'Content
 const PAGES = [
   ['/', 'Missing Entities'], ['/slots', 'Missing Band Slots'], ['/matrix', 'Full Matrix'],
   ['/advisor', 'Suggestions'], ['/paper', 'Paper QSLs'], ['/import', 'Import'], ['/settings', 'Settings'],
+  ['/help', 'Help'],
 ];
+
+// Each page's section in the user guide (D58). The Help link in the header
+// opens the guide there. tests/test_help.py checks every anchor exists.
+const HELP_SECTIONS = {
+  '/': 'missing-entities', '/slots': 'missing-band-slots', '/matrix': 'full-matrix',
+  '/advisor': 'suggestions-for-dx-monitor', '/paper': 'paper-qsls',
+  '/import': 'getting-your-lotw-data-in-import', '/settings': 'settings',
+};
+const HELP_ICON = '<b aria-hidden="true">?</b>';
 
 function profileText(p) {
   const order = ['160M', '80M', '40M', '30M', '20M', '17M', '15M', '12M', '10M', '6M', '2M'];
@@ -54,14 +64,16 @@ function profileText(p) {
 
 function renderChrome({ title, subtitle, actions = '' }) {
   const here = location.pathname;
+  const help = HELP_SECTIONS[here]
+    ? `<a class="helplink" href="/help#${HELP_SECTIONS[here]}" title="Open the user guide at this page's section">${HELP_ICON}Help</a>` : '';
   document.getElementById('chrome').innerHTML = `
     <header class="top">
       <div>
-        <div class="brand">N4MI DXCC ANALYZER</div>
+        <div class="brand">N4MI DXCC ANALYZER<span class="ver" id="appver"></span></div>
         <h1>${esc(title)}</h1>
         <div class="sub">${subtitle || ''}</div>
       </div>
-      <div class="noprint" style="display:flex;gap:12px">${actions}</div>
+      <div class="noprint" style="display:flex;gap:12px;align-items:center">${help}${actions}</div>
     </header>
     <nav class="views" aria-label="Views">
       ${PAGES.map(([href, name]) => href
@@ -90,6 +102,7 @@ async function showDXMonExport() {
 async function checkHealth() {
   try {
     const st = await (await fetch('/api/status')).json();
+    if (st.version) document.getElementById('appver').textContent = `v${st.version}`;
     if (!st.ok && st.error) {
       document.getElementById('health').innerHTML =
         `<div class="notice bad" style="margin-top:16px"><div><div class="t">Problem</div><div>${esc(st.error)}</div></div></div>`;

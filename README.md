@@ -14,7 +14,7 @@ It runs LAN-only on a home NAS (FastAPI + SQLite + vanilla HTML/CSS/JS in Docker
 
 ## Status
 
-**Phase 1, Build Step 3: ready to deploy on the UGreen NAS** (Docker, Portainer, port 8086). What exists:
+**v1.0 released 2026-10-13; current release v1.3.0.** Deployed on the UGreen NAS (Docker, Portainer, port 8086). Since v1.0: DXpedition tags from DX Monitor, the Suggestions page for DX Monitor's Needed list, the user guide, the security review fixes, and the in-app Help page. The version running is shown beside the app's name on every page. What's in the repository:
 
 | File | What it does |
 |---|---|
@@ -33,9 +33,12 @@ It runs LAN-only on a home NAS (FastAPI + SQLite + vanilla HTML/CSS/JS in Docker
 | `app/exports.py` | CSV and workbook exports, including the DX Monitor bridge file |
 | `app/dxmon.py` | Optional read-only link to DX Monitor: DXpeditions, Watched and Needed lists |
 | `app/advisor.py` | Suggestions page: what to add to DX Monitor's Needed list, in HamAlert's spellings |
+| `app/guide.py` | The Help page: renders `User_Guide.md` (and its `images/`) inside the app |
+| `app/version.py` | The version number shown in the app; update it before tagging a release |
 | `static/` | The web pages: plain HTML, CSS and JavaScript, no build step |
 | `app/data/dxcc_entities.csv` | The 402 DXCC entities (340 current), with continent and CQ zone |
 | `tools/build_reference.py` | Development only: rebuilds that table from the verified list and AD1C's `cty.csv` |
+| `tools/make_guide_diagrams.py` | Development only: draws the guide's two copy-selection diagrams |
 
 ## Key rules
 

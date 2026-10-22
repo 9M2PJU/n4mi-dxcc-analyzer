@@ -265,3 +265,43 @@ table.adv tr.dxrow td { background: var(--dx-bg); }
   table.adv { min-width: 0; font-size: 11pt; } table.adv th, table.adv td { color: #000; background: #fff !important; border-bottom-color: #ccc; padding: 4px 8px; }
   table.adv tr { break-inside: avoid; } .chip, .tag.indx { color: #000; border-color: #666; }
 }
+
+/* version beside the brand, Help link in every header, Help page (D58) */
+.brand .ver { color: var(--muted); font-weight: 500; letter-spacing: .04em; margin-left: 10px; }
+.helplink { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; color: var(--muted); text-decoration: none; font-size: 14px;
+  border: 1px solid var(--line2); border-radius: 999px; padding: 4px 12px; }
+.helplink:hover, .helplink:focus-visible { color: var(--amber); border-color: var(--amber); }
+.helplink:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.helplink b { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid currentColor; font: 700 11px var(--mono); }
+.guide { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 40px; align-items: start; }
+.toc { position: sticky; top: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
+  max-height: calc(100vh - 48px); overflow: auto; }
+.toc .k { font: 12px var(--mono); letter-spacing: .1em; color: var(--muted); margin-bottom: 8px; }
+.toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.toc ul ul { padding-left: 14px; margin: 2px 0 4px; }
+.toc a { display: block; padding: 5px 8px; border-radius: 6px; color: var(--soft); text-decoration: none; font-size: 14px; }
+.toc ul ul a { font-size: 13px; color: var(--muted); }
+.toc a:hover { background: #1c2330; color: var(--text); }
+.toc a[aria-current] { background: var(--amber-bg); color: var(--amber); }
+article.doc { max-width: 860px; font-size: 16px; line-height: 1.6; color: var(--soft); }
+article.doc h2 { font: 700 22px var(--mono); color: var(--text); margin: 44px 0 12px; padding-top: 18px; border-top: 1px solid var(--line); scroll-margin-top: 16px; }
+article.doc h2:first-of-type { margin-top: 28px; }
+article.doc h3 { font: 600 17px var(--mono); color: var(--text); margin: 28px 0 8px; scroll-margin-top: 16px; }
+article.doc strong { color: var(--text); }
+article.doc code { font: 13px var(--mono); background: #1c2330; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; color: var(--text); }
+article.doc img { display: block; max-width: 100%; height: auto; border: 1px solid var(--line2); border-radius: 10px; margin: 16px 0 6px; }
+article.doc table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 12px 0; }
+article.doc th, article.doc td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+article.doc th { font: 600 12px var(--mono); color: var(--muted); letter-spacing: .06em; }
+article.doc li { margin: 3px 0; }
+article.doc .callout { border: 1px solid var(--amber); background: var(--amber-bg); border-radius: 12px; padding: 14px 18px; margin: 12px 0 20px; }
+article.doc .callout .t { font: 600 13px var(--mono); letter-spacing: .08em; color: var(--amber); text-transform: uppercase; margin-bottom: 6px; }
+@media (max-width: 900px) { .guide { grid-template-columns: 1fr; } .toc { position: static; max-height: none; } }
+@media print {
+  .guide { display: block; } .toc { display: none !important; }
+  article.doc { max-width: none; font-size: 11pt; color: #000; }
+  article.doc h2, article.doc h3, article.doc strong, article.doc code { color: #000; background: none; }
+  article.doc h2 { break-after: avoid; } article.doc img { break-inside: avoid; }
+  article.doc .callout { background: none; border-color: #999; } article.doc .callout .t { color: #000; }
+  .brand .ver { color: #555; }
+}

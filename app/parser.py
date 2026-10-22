@@ -109,6 +109,30 @@ def _callsign_from_title(cells):
     return candidate if CALLSIGN.match(candidate) else None
 
 
+# Wrong-table hints (Dan, 2026-10-21). Users of the old app mixed up LoTW's two
+# DXCC tables, so a paste of the wrong one names it and points to the right page.
+STATUS_HEADINGS = ("new lotw qsls", "lotw qsls in process", "dxcc credits awarded")
+# Column names of the matrix; three or more on one line means a matrix header
+# (possibly changed by LoTW) is present, so the wrong-table hint isn't given.
+MATRIX_HINT = {"mix", "ph", "cw", "rt", "sat", "160"}
+ARRL_FOOTER = "reproduction of material from any arrl web page"
+WRONG_TABLE = ("This looks like LoTW's Account Status table (the summary of counts), not the "
+               "Award Credit Matrix. On LoTW's DXCC Award Account page, click View Award Credit "
+               "Matrix and copy that table instead. The Account Status table goes in Settings, "
+               "under Check against LoTW Account Status. Nothing was imported.")
+
+
+def _is_status_heading(cells):
+    low = [" ".join(c.lower().split()) for c in cells if c]
+    return all(h in low for h in STATUS_HEADINGS)
+
+
+def is_matrix_header(cells):
+    """True if this line of cells is the matrix's column header (used by the
+    Account Status check to recognise a matrix pasted in the wrong place)."""
+    return _header_index(_trim([_clean(c) for c in cells])) is not None
+
+
 def _looks_like_header_attempt(cells):
     low = {c.lower() for c in cells}
     return "deleted" in low and "mix" in low
@@ -118,10 +142,16 @@ def parse_cells(cell_rows):
     """Parse an iterable of (line_number, [cell, ...]) into a ParseResult."""
     result = ParseResult()
     header_found = False
+    status_seen = False
+    matrix_like = False        # a line resembling the matrix's column header
     for line, raw in cell_rows:
         full = [_clean(c) for c in raw]
         cells = _trim(full)
         if not header_found:
+            if _is_status_heading(cells):
+                status_seen = True
+            if len({c.lower() for c in cells} & MATRIX_HINT) >= 3:
+                matrix_like = True
             idx = _header_index(cells)
             if idx is not None:
                 if idx not in (1, 2):
@@ -146,6 +176,12 @@ def parse_cells(cell_rows):
         if len(result.errors) >= MAX_ERRORS:
             result.errors.append("Too many problems to list; stopped reading. Nothing was imported.")
             return result
+        if len(cells) == 1 and cells[0].lower().startswith(ARRL_FOOTER):
+            result.errors.append(
+                f"Line {line}: the ARRL copyright line under the table was copied too. Copy "
+                "again, stopping at the last cell of the table, or delete that line from the "
+                "box. Nothing was imported.")
+            continue
         if len(cells) < 2:
             # Prefix and entity name are always present (a blank prefix still
             # leaves an empty first cell before the name).
@@ -183,7 +219,9 @@ def parse_cells(cell_rows):
         result.rows.append(MatrixRow(line, prefix, name, deleted.lower() == "yes",
                                      frozenset(credits)))
 
-    if not header_found:
+    if not header_found and status_seen and not matrix_like:
+        result.errors.append(WRONG_TABLE)
+    elif not header_found:
         result.errors.append("No LoTW matrix header found (the line with Deleted, Mix, Ph, CW, "
                              "RT, SAT, 160 ... 2). Nothing was imported.")
     return result

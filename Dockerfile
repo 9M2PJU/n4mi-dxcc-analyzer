@@ -9,6 +9,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ app/
 COPY static/ static/
+# The user guide and its pictures, shown on the Help page (D58).
+COPY User_Guide.md .
+COPY images/ images/
 
 # The SQLite database lives here. The stack bind-mounts the NAS folder
 # /volume2/docker/n4mi-dxcc-analyzer/data onto it. If the mount is missing,

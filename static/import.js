@@ -15,10 +15,11 @@ function inputForm() {
   return `<section class="panel" aria-labelledby="paste-h" style="display:flex;flex-direction:column;gap:18px;padding:24px">
     <h2 id="paste-h">Paste from LoTW</h2>
     <ol class="steps">
-      <li>In LoTW, open <strong>Awards › DXCC › Award Credit Matrix</strong>.</li>
-      <li>Select the whole table, from <span class="mono small">DXCC Award Credit Report</span> down to the last row, and copy it.</li>
+      <li>In LoTW, open <strong>Awards › DXCC Award Account</strong>, click <strong>View Award Credit Matrix</strong>, then <strong>No Scroll</strong>.</li>
+      <li>Select everything from the <span class="mono small">DXCC Award Credit Report</span> banner down to the last cell of the table, and copy it.</li>
       <li>Paste it below and press <strong>Check paste</strong>. Nothing is saved until you press Save.</li>
     </ol>
+    <p class="small muted" style="margin:0">Not the Account Status box at the top of that page: it goes in Settings. <a href="/help#copying-the-matrix-from-lotw">Step-by-step with a picture</a></p>
     <label for="paste-box" class="mono small muted" style="letter-spacing:.1em">MATRIX TEXT</label>
     <textarea id="paste-box" rows="10" spellcheck="false" placeholder="DXCC Award Credit Report&#10;Your Name, CALLSIGN&#10;Prefix&#10;…"></textarea>
     <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">

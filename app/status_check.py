@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 from .analysis import totals
 from .categories import BANDS, CW, DIGITAL, LABELS, MIXED, PHONE, SAT, TRACKED
 from .marks import counts_by_category
+from .parser import is_matrix_header
 
 AWARD_NAMES = {"MIXED": MIXED, "CW": CW, "PHONE": PHONE, "DIGITAL": DIGITAL,
                "SATELLITE": SAT, "SAT": SAT,
@@ -84,8 +85,11 @@ def parse_status(text):
     out = StatusParse()
     text = (text or "").replace("\r\n", "\n").replace("\r", "\n")
     headings_seen = False
+    matrix_seen = False
     for n, line in enumerate(text.split("\n"), 1):
         cells = [c.replace("\xa0", " ").strip() for c in line.split("\t")]
+        if not headings_seen and is_matrix_header(line.split("\t")):
+            matrix_seen = True
         if _is_heading_line(cells):
             headings_seen = True
             continue
@@ -103,6 +107,13 @@ def parse_status(text):
             out.errors.append(f"Line {n}: {cells[0]!r} appears twice.")
             continue
         out.rows[cat] = StatusRow(new, proc, awarded)
+    if not headings_seen and matrix_seen:
+        # Wrong-table hint (Dan, 2026-10-21): the matrix pasted here.
+        out.errors = ["This looks like LoTW's Award Credit Matrix (one row per entity), not "
+                      "the Account Status table. The matrix goes in Import. For this check, "
+                      "copy the Account Status box at the top of LoTW's DXCC Award Account "
+                      "page, from the DXCC Award heading down to the Challenge row."]
+        return out
     if not headings_seen:
         out.errors.insert(0, "This does not look like LoTW's DXCC Account Status table (the line "
                              "with New LoTW QSLs, LoTW QSLs in Process, DXCC Credits Awarded "
